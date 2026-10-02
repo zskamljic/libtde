@@ -37,6 +37,7 @@ private slots:
         QCOMPARE(config.windowButtons.order.size(), 3u);
         QCOMPARE(config.appearance.theme, u"arc-dark"_s);
         QCOMPARE(config.appearance.cornerRadius, 5);
+        QCOMPARE(config.lock.after, 5);
     }
 
     void desktopConfig()
@@ -49,6 +50,7 @@ private slots:
                 "window_buttons = { position = \"left\", order = { \"close\", \"maximize\" } },\n"
                 "appearance = { theme = \"arc\", icon_theme = \"Paper\", corner_radius = radius * 2,\n"
                 "               colors = { accent = \"#ff0000\" } },\n"
+                "lock = { after = 15 },\n"
                 "}\n"),
             config);
         QVERIFY(warnings.has_value());
@@ -59,6 +61,7 @@ private slots:
         QCOMPARE(config.appearance.iconTheme, u"Paper"_s);
         QCOMPARE(config.appearance.cornerRadius, 8);
         QCOMPARE(config.appearance.colors.value(u"accent"_s), u"#ff0000"_s);
+        QCOMPARE(config.lock.after, 15);
     }
 
     void badValuesWarnAndKeepDefaults()
@@ -69,15 +72,17 @@ private slots:
                                          "return {\n"
                                          "window_buttons = { position = \"top\", order = { \"close\", \"shade\" } },\n"
                                          "appearance = { corner_radius = 100, theme = 3 },\n"
+                                         "lock = { after = -1 },\n"
                                          "}\n"),
                 config);
         QVERIFY(warnings.has_value());
-        QCOMPARE(warnings->size(), 4);
+        QCOMPARE(warnings->size(), 5);
         QVERIFY(warnings->first().startsWith(u"window_buttons.position:"_s));
         QCOMPARE(config.windowButtons.side, tde::ButtonSide::Right);
         QCOMPARE(config.windowButtons.order, std::vector {tde::WindowButton::Close});
         QCOMPARE(config.appearance.cornerRadius, 5);
         QCOMPARE(config.appearance.theme, u"arc-dark"_s);
+        QCOMPARE(config.lock.after, 5);
     }
 
     void createsDefaults()

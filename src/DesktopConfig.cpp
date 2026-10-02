@@ -69,6 +69,12 @@ void parse(LuaTableReader& reader, DesktopConfig& config)
                 [&](const QString& name, const QString& value) { appearance.colors.insert(name, value); });
         });
     });
+
+    reader.table("lock", [&] {
+        // Up to a day; longer is as good as never, which 0 says.
+        if (const auto after = reader.integer("after", 0, 24 * 60))
+            config.lock.after = *after;
+    });
 }
 
 } // namespace

@@ -35,4 +35,10 @@ return {
         --     accent = "#5294e2",
         -- },
     },
+
+    lock = {
+        -- Minutes without input before the screen locks; 0 locks only when asked, and
+        -- before sleeping. Programs such as video players keep it from locking meanwhile.
+        after = 5,              -- 0 to 1440
+    },
 }

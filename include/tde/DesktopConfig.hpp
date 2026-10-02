@@ -31,8 +31,15 @@ struct DesktopConfig {
         bool operator==(const Appearance&) const = default;
     };
 
+    struct Lock {
+        int after = 5; // minutes without input before the screen locks; 0 for never
+
+        bool operator==(const Lock&) const = default;
+    };
+
     WindowButtons windowButtons;
     Appearance appearance;
+    Lock lock;
     QString terminal; // program to open terminals with; empty picks one
 
     bool operator==(const DesktopConfig&) const = default;
