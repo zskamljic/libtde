@@ -18,6 +18,6 @@ pkgbase = libtde
 	optdepends = adwaita-icon-theme: fallback for icons missing from the icon theme
 	provides = libtde.so
 	source = libtde-0.2.0.tar.gz::https://github.com/zskamljic/libtde/archive/refs/tags/v0.2.0.tar.gz
-	sha256sums = SKIP
+	sha256sums = e4cd5448537fb2e05a17dbed65f5d8e76a3c3f4307c4d116de2a639b799f18a5
 
 pkgname = libtde
