@@ -2,7 +2,10 @@
 
 #include "IconRepair.hpp"
 
+#include <QAbstractItemView>
+#include <QAbstractSpinBox>
 #include <QApplication>
+#include <QComboBox>
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QFileInfo>
@@ -12,9 +15,12 @@
 #include <QPalette>
 #include <QProxyStyle>
 #include <QSettings>
+#include <QSlider>
 #include <QStandardPaths>
 #include <QStyleFactory>
 #include <QStyleHints>
+#include <QStyleOption>
+#include <QStyledItemDelegate>
 
 #include <algorithm>
 #include <cstdio>
@@ -156,10 +162,18 @@ QLabel#DialogTitle { font-weight: bold; }
 QLabel#AboutName { font-size: 18pt; font-weight: bold; }
 QLabel#AboutDetails { color: @dim_text@; }
 QLineEdit {
-    background: @entry@; color: @text@; border: 1px solid @border@; border-radius: @radius_small@; padding: 5px;
+    background: @fill@; color: @text@; border: 2px solid transparent; border-radius: @radius@; padding: 4px 6px;
     selection-background-color: @accent@; selection-color: @accent_text@;
 }
-QLineEdit:focus { border-color: @accent@; }
+QLineEdit:hover { background: @fill_hover@; }
+QLineEdit:focus { border-color: @focus@; background: @fill@; }
+QLineEdit:disabled { color: @dim_text@; }
+QAbstractSpinBox QLineEdit, QComboBox QLineEdit, QAbstractSpinBox QLineEdit:hover, QComboBox QLineEdit:hover,
+QAbstractSpinBox QLineEdit:focus, QComboBox QLineEdit:focus {
+    background: transparent; border: none; padding: 0;
+}
+
+QComboBox QAbstractItemView { background: transparent; border: none; padding: 0; outline: 0; }
 QPushButton {
     background: @header@; color: @text@;
     border: 1px solid @border@; border-radius: @radius_small@; padding: 6px 14px;
@@ -191,10 +205,31 @@ QString cssColor(const QColor& color)
     return u"rgba(%1, %2, %3, %4)"_s.arg(color.red()).arg(color.green()).arg(color.blue()).arg(color.alpha());
 }
 
+QColor withAlpha(QColor color, int alpha)
+{
+    color.setAlpha(alpha);
+    return color;
+}
+
+// The background of entries and spin boxes, a shade of the text over whatever is below.
+QColor entryFill(const Colors& colors, bool hovered)
+{
+    return withAlpha(colors.text, hovered ? 30 : 20);
+}
+
+QColor focusRing(const Colors& colors)
+{
+    return withAlpha(colors.accent, 170);
+}
+
 QString expanded(QString sheet, const Colors& colors)
 {
     for (const auto& [name, member] : namedColors)
         sheet.replace(u'@' + name.toString() + u'@', cssColor(colors.*member));
+    // Entries are filled in rather than outlined, as GNOME's are.
+    sheet.replace(u"@fill@"_s, cssColor(entryFill(colors, false)));
+    sheet.replace(u"@fill_hover@"_s, cssColor(entryFill(colors, true)));
+    sheet.replace(u"@focus@"_s, cssColor(focusRing(colors)));
     const auto px = [](int value) { return u"%1px"_s.arg(value); };
     sheet.replace(u"@radius@"_s, px(radius(RadiusSize::Normal)));
     sheet.replace(u"@radius_small@"_s, px(radius(RadiusSize::Small)));
@@ -235,6 +270,90 @@ QPalette palette(const Colors& c)
     return p;
 }
 
+// Sizes of the controls drawn after GNOME's below.
+constexpr int ArrowWidth = 28; // the part of a drop-down with its arrow
+constexpr int SpinButtonWidth = 32; // each of the - and + of a spin box
+constexpr int ControlHeight = 34;
+constexpr int SliderGroove = 4;
+constexpr int SliderKnob = 20;
+
+// A chevron pointing down, as GNOME's drop-downs have, or up.
+void drawChevron(QPainter* painter, QPointF center, bool down, const QColor& color)
+{
+    constexpr qreal w = 4.0;
+    constexpr qreal h = 2.25;
+    const qreal dy = down ? h : -h;
+    painter->setPen(QPen(color, 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter->setBrush(Qt::NoBrush);
+    painter->drawPolyline(
+        QList<QPointF> {center + QPointF(-w, -dy), center + QPointF(0, dy), center + QPointF(w, -dy)});
+}
+
+void drawCheck(QPainter* painter, QPointF center, const QColor& color)
+{
+    painter->setPen(QPen(color, 1.75, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter->setBrush(Qt::NoBrush);
+    painter->drawPolyline(
+        QList<QPointF> {center + QPointF(-4.5, 0.5), center + QPointF(-1.5, 3.5), center + QPointF(4.5, -3.5)});
+}
+
+// The items of a drop-down's list: rounded where the pointer is, with a check by the one chosen.
+class DropDownDelegate : public QStyledItemDelegate {
+public:
+    explicit DropDownDelegate(QComboBox* combo)
+        : QStyledItemDelegate(combo)
+        , m_combo(combo)
+    {
+    }
+
+    void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override
+    {
+        const auto& c = colors();
+        painter->save();
+        painter->setRenderHint(QPainter::Antialiasing);
+        if (index.data(Qt::AccessibleDescriptionRole).toString() == u"separator") {
+            painter->fillRect(
+                QRectF(option.rect.left() + 6, option.rect.center().y(), option.rect.width() - 12, 1), c.border);
+            painter->restore();
+            return;
+        }
+        const bool enabled = (option.state & QStyle::State_Enabled) && (index.flags() & Qt::ItemIsEnabled);
+        const QRectF row = QRectF(option.rect).adjusted(0, 1, 0, -1);
+        if (enabled && (option.state & (QStyle::State_MouseOver | QStyle::State_Selected))) {
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(option.state & QStyle::State_Sunken ? c.pressed : c.hover);
+            const int r = radius(RadiusSize::Small);
+            painter->drawRoundedRect(row, r, r);
+        }
+        QRectF text = row.adjusted(10, 0, -34, 0);
+        if (const QIcon icon = index.data(Qt::DecorationRole).value<QIcon>(); !icon.isNull()) {
+            const QSize size = option.decorationSize.isValid() ? option.decorationSize : QSize(16, 16);
+            const QRect place(QPoint(int(text.left()), int(row.center().y() - size.height() / 2.0)), size);
+            icon.paint(painter, place, Qt::AlignCenter, enabled ? QIcon::Normal : QIcon::Disabled);
+            text.setLeft(text.left() + size.width() + 8);
+        }
+        painter->setFont(option.font);
+        painter->setPen(enabled ? c.text : c.dimText);
+        const QString label
+            = option.fontMetrics.elidedText(index.data(Qt::DisplayRole).toString(), Qt::ElideRight, int(text.width()));
+        painter->drawText(text, Qt::AlignVCenter | Qt::AlignLeft, label);
+        if (index.row() == m_combo->currentIndex())
+            drawCheck(painter, QPointF(row.right() - 18, row.center().y()), enabled ? c.text : c.dimText);
+        painter->restore();
+    }
+
+    QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override
+    {
+        if (index.data(Qt::AccessibleDescriptionRole).toString() == u"separator")
+            return {10, 9};
+        QSize size = QStyledItemDelegate::sizeHint(option, index);
+        return {size.width() + 10 + 34, std::max(size.height() + 12, 32)};
+    }
+
+private:
+    QComboBox* m_combo;
+};
+
 class AppStyle : public QProxyStyle {
 public:
     AppStyle()
@@ -249,6 +368,10 @@ public:
         case SH_ItemView_ActivateItemOnSingleClick:
         case SH_DialogButtonBox_ButtonsHaveIcons:
             return 0;
+        case SH_ComboBox_Popup:
+            return 0; // a list below it, as GNOME's drop-downs open, rather than a menu over it
+        case SH_ComboBox_AllowWheelScrolling:
+            return 0; // scrolling a page goes past them, rather than changing them
         case SH_DialogButtonLayout:
             return QDialogButtonBox::GnomeLayout; // Cancel on the left, the action on the right
         default:
@@ -258,15 +381,284 @@ public:
 
     void polish(QWidget* widget) override
     {
-        // Menus and tooltips are windows of their own; they need an alpha channel for
-        // rounded corners.
-        const bool popup
-            = qobject_cast<QMenu*>(widget) || widget->windowType() == Qt::ToolTip || widget->objectName() == u"Popover";
+        // Menus, tooltips and the lists of drop-downs are windows of their own; they need an
+        // alpha channel for rounded corners.
+        const bool popup = qobject_cast<QMenu*>(widget) || widget->windowType() == Qt::ToolTip
+            || widget->objectName() == u"Popover" || widget->inherits("QComboBoxPrivateContainer");
         if (popup && !widget->testAttribute(Qt::WA_WState_Created)) {
             widget->setAttribute(Qt::WA_TranslucentBackground);
             widget->setWindowFlag(Qt::NoDropShadowWindowHint);
         }
+        // Qt's own delegates draw the items as menus or plain lists; others are the program's.
+        if (auto* combo = qobject_cast<QComboBox*>(widget)) {
+            QAbstractItemDelegate* delegate = combo->itemDelegate();
+            if (!delegate || delegate->inherits("QComboBoxDelegate") || delegate->inherits("QComboMenuDelegate"))
+                combo->setItemDelegate(new DropDownDelegate(combo)); // the combo box owns it
+            combo->view()->setMouseTracking(true);
+        }
+        if (auto* spin = qobject_cast<QAbstractSpinBox*>(widget)) {
+            spin->setButtonSymbols(QAbstractSpinBox::PlusMinus);
+            // Its entry, which takes the spin box's palette, shows the fill drawn below it through.
+            QPalette palette = spin->palette();
+            palette.setColor(QPalette::Base, Qt::transparent);
+            spin->setPalette(palette);
+        }
         QProxyStyle::polish(widget);
+    }
+
+    int pixelMetric(PixelMetric metric, const QStyleOption* option, const QWidget* widget) const override
+    {
+        switch (metric) {
+        case PM_SliderThickness:
+        case PM_SliderControlThickness:
+        case PM_SliderLength:
+            return SliderKnob + 2;
+        case PM_SliderTickmarkOffset:
+            return 4;
+        case PM_DefaultFrameWidth:
+            // Room around the items of a drop-down's list.
+            if (widget && widget->inherits("QComboBoxPrivateContainer"))
+                return 5;
+            return QProxyStyle::pixelMetric(metric, option, widget);
+        default:
+            return QProxyStyle::pixelMetric(metric, option, widget);
+        }
+    }
+
+    QSize sizeFromContents(
+        ContentsType type, const QStyleOption* option, const QSize& contents, const QWidget* widget) const override
+    {
+        switch (type) {
+        case CT_ComboBox:
+            return {contents.width() + 12 + ArrowWidth, std::max(contents.height() + 12, ControlHeight)};
+        case CT_SpinBox:
+            return {contents.width() + 12 + 2 * SpinButtonWidth, std::max(contents.height() + 12, ControlHeight)};
+        default:
+            return QProxyStyle::sizeFromContents(type, option, contents, widget);
+        }
+    }
+
+    QRect subControlRect(
+        ComplexControl control, const QStyleOptionComplex* option, SubControl sub, const QWidget* widget) const override
+    {
+        const QRect r = option->rect;
+        if (control == CC_ComboBox) {
+            switch (sub) {
+            case SC_ComboBoxFrame:
+                return r;
+            case SC_ComboBoxArrow:
+                return visualRect(
+                    option->direction, r, QRect(r.right() - ArrowWidth + 1, r.top(), ArrowWidth, r.height()));
+            case SC_ComboBoxEditField:
+                return visualRect(option->direction, r, r.adjusted(10, 3, -ArrowWidth, -3));
+            case SC_ComboBoxListBoxPopup:
+                return r;
+            default:
+                break;
+            }
+        }
+        if (control == CC_SpinBox) {
+            switch (sub) {
+            case SC_SpinBoxFrame:
+                return r;
+            case SC_SpinBoxUp:
+                return visualRect(
+                    option->direction, r, QRect(r.right() - SpinButtonWidth + 1, r.top(), SpinButtonWidth, r.height()));
+            case SC_SpinBoxDown:
+                return visualRect(option->direction, r,
+                    QRect(r.right() - 2 * SpinButtonWidth + 1, r.top(), SpinButtonWidth, r.height()));
+            case SC_SpinBoxEditField:
+                return visualRect(option->direction, r, r.adjusted(10, 3, -2 * SpinButtonWidth - 4, -3));
+            default:
+                break;
+            }
+        }
+        return QProxyStyle::subControlRect(control, option, sub, widget);
+    }
+
+    void drawComplexControl(ComplexControl control, const QStyleOptionComplex* option, QPainter* painter,
+        const QWidget* widget) const override
+    {
+        if (const auto* combo = qstyleoption_cast<const QStyleOptionComboBox*>(option);
+            combo && control == CC_ComboBox) {
+            drawDropDown(*combo, painter, widget);
+            return;
+        }
+        if (const auto* spin = qstyleoption_cast<const QStyleOptionSpinBox*>(option); spin && control == CC_SpinBox) {
+            drawSpinBox(*spin, painter, widget);
+            return;
+        }
+        if (const auto* slider = qstyleoption_cast<const QStyleOptionSlider*>(option); slider && control == CC_Slider) {
+            drawSlider(*slider, painter, widget);
+            return;
+        }
+        QProxyStyle::drawComplexControl(control, option, painter, widget);
+    }
+
+    void drawControl(
+        ControlElement element, const QStyleOption* option, QPainter* painter, const QWidget* widget) const override
+    {
+        // The list of a drop-down, as a popover.
+        if (element == CE_ShapedFrame && widget && widget->inherits("QComboBoxPrivateContainer")) {
+            const auto& c = colors();
+            const int r = radius(RadiusSize::Large);
+            painter->save();
+            painter->setRenderHint(QPainter::Antialiasing);
+            painter->setPen(c.border);
+            painter->setBrush(c.base);
+            painter->drawRoundedRect(QRectF(option->rect).adjusted(0.5, 0.5, -0.5, -0.5), r, r);
+            painter->restore();
+            return;
+        }
+        QProxyStyle::drawControl(element, option, painter, widget);
+    }
+
+private:
+    // Like a button, with a chevron at the end; filled in like an entry when it can be typed in.
+    void drawDropDown(const QStyleOptionComboBox& option, QPainter* painter, const QWidget* widget) const
+    {
+        const auto& c = colors();
+        const bool enabled = option.state & State_Enabled;
+        const bool hovered = enabled && (option.state & State_MouseOver);
+        const bool open = option.state & (State_On | State_Sunken);
+        const int r = radius(RadiusSize::Small);
+        painter->save();
+        painter->setRenderHint(QPainter::Antialiasing);
+        const QRectF frame = QRectF(option.rect).adjusted(0.5, 0.5, -0.5, -0.5);
+        if (option.editable) {
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(entryFill(c, hovered));
+            painter->drawRoundedRect(frame, radius(), radius());
+            if (option.state & State_HasFocus)
+                drawFocus(painter, QRectF(option.rect), radius());
+        } else {
+            painter->setPen(c.border);
+            painter->setBrush(open || hovered ? c.base : c.header);
+            painter->drawRoundedRect(frame, r, r);
+            if (open) {
+                painter->setBrush(c.hover);
+                painter->drawRoundedRect(frame, r, r);
+            }
+            if ((option.state & State_HasFocus) && (option.state & State_KeyboardFocusChange))
+                drawFocus(painter, QRectF(option.rect), r);
+        }
+        const QRect arrow = subControlRect(CC_ComboBox, &option, SC_ComboBoxArrow, widget);
+        drawChevron(painter, QRectF(arrow).center() - QPointF(3, 0), true, enabled ? c.text : c.dimText);
+        painter->restore();
+    }
+
+    // An entry with - and + at its end, as GNOME's spin buttons have them.
+    void drawSpinBox(const QStyleOptionSpinBox& option, QPainter* painter, const QWidget* widget) const
+    {
+        const auto& c = colors();
+        const bool enabled = option.state & State_Enabled;
+        const int r = radius();
+        painter->save();
+        painter->setRenderHint(QPainter::Antialiasing);
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(entryFill(c, enabled && (option.state & State_MouseOver)));
+        painter->drawRoundedRect(QRectF(option.rect), r, r);
+        if (option.state & State_HasFocus)
+            drawFocus(painter, QRectF(option.rect), r);
+
+        const auto button = [&](SubControl sub, QAbstractSpinBox::StepEnabledFlag step, bool plus) {
+            const QRectF place = subControlRect(CC_SpinBox, &option, sub, widget);
+            const bool can = enabled && (option.stepEnabled & step);
+            if (can && (option.activeSubControls & sub)) {
+                painter->setPen(Qt::NoPen);
+                painter->setBrush((option.state & State_Sunken) ? c.pressed : c.hover);
+                painter->drawRoundedRect(place.adjusted(3, 3, -3, -3), r, r);
+            }
+            painter->setPen(QPen(can ? c.text : c.dimText, 1.5, Qt::SolidLine, Qt::RoundCap));
+            const QPointF center = place.center();
+            painter->drawLine(center + QPointF(-5, 0), center + QPointF(5, 0));
+            if (plus)
+                painter->drawLine(center + QPointF(0, -5), center + QPointF(0, 5));
+            // A line before each button, as between the parts of GNOME's.
+            painter->fillRect(QRectF(place.left(), place.top() + 7, 1, place.height() - 14), withAlpha(c.text, 30));
+        };
+        if (option.buttonSymbols != QAbstractSpinBox::NoButtons) {
+            button(SC_SpinBoxDown, QAbstractSpinBox::StepDownEnabled, false);
+            button(SC_SpinBoxUp, QAbstractSpinBox::StepUpEnabled, true);
+        }
+        painter->restore();
+    }
+
+    // A thin trough filled in up to a round knob, with marks beside it when asked for.
+    void drawSlider(const QStyleOptionSlider& option, QPainter* painter, const QWidget* widget) const
+    {
+        const auto& c = colors();
+        const bool enabled = option.state & State_Enabled;
+        const bool horizontal = option.orientation == Qt::Horizontal;
+        const QRect groove = QProxyStyle::subControlRect(CC_Slider, &option, SC_SliderGroove, widget);
+        const QRect handle = QProxyStyle::subControlRect(CC_Slider, &option, SC_SliderHandle, widget);
+        const QPointF knob = QRectF(handle).center();
+        painter->save();
+        painter->setRenderHint(QPainter::Antialiasing);
+        painter->setPen(Qt::NoPen);
+
+        // The trough reaches as far as the knob's middle can go.
+        const qreal inset = SliderKnob / 2.0 + 1;
+        QRectF trough;
+        QRectF filled;
+        if (horizontal) {
+            const qreal y = knob.y() - SliderGroove / 2.0;
+            trough = QRectF(groove.left() + inset, y, groove.width() - 2 * inset, SliderGroove);
+            filled = option.upsideDown ? QRectF(knob.x(), y, trough.right() - knob.x(), SliderGroove)
+                                       : QRectF(trough.left(), y, knob.x() - trough.left(), SliderGroove);
+        } else {
+            const qreal x = knob.x() - SliderGroove / 2.0;
+            trough = QRectF(x, groove.top() + inset, SliderGroove, groove.height() - 2 * inset);
+            filled = option.upsideDown ? QRectF(x, trough.top(), SliderGroove, knob.y() - trough.top())
+                                       : QRectF(x, knob.y(), SliderGroove, trough.bottom() - knob.y());
+        }
+        constexpr qreal round = SliderGroove / 2.0;
+        painter->setBrush(withAlpha(c.text, 45));
+        painter->drawRoundedRect(trough, round, round);
+        painter->setBrush(enabled ? c.accent : c.dimText);
+        painter->drawRoundedRect(filled, round, round);
+
+        if (option.tickPosition != QSlider::NoTicks && option.maximum > option.minimum) {
+            const int interval = option.tickInterval > 0 ? option.tickInterval : std::max(option.pageStep, 1);
+            painter->setBrush(withAlpha(c.text, 90));
+            const int span = int(horizontal ? trough.width() : trough.height());
+            for (int value = option.minimum; value <= option.maximum; value += interval) {
+                const int at = sliderPositionFromValue(option.minimum, option.maximum, value, span, option.upsideDown);
+                const auto mark = [&](qreal offset) {
+                    painter->drawRoundedRect(horizontal ? QRectF(trough.left() + at - 0.75, knob.y() + offset, 1.5, 5)
+                                                        : QRectF(knob.x() + offset, trough.top() + at - 0.75, 5, 1.5),
+                        0.75, 0.75);
+                };
+                if (option.tickPosition & QSlider::TicksBelow)
+                    mark(SliderKnob / 2.0 + 1);
+                if (option.tickPosition & QSlider::TicksAbove)
+                    mark(-SliderKnob / 2.0 - 6);
+            }
+        }
+
+        // The knob, white in either theme, with a soft shadow below.
+        const qreal knobRadius = SliderKnob / 2.0;
+        painter->setBrush(QColor(0, 0, 0, 40));
+        painter->drawEllipse(knob + QPointF(0, 1), knobRadius + 0.5, knobRadius + 0.5);
+        const bool active = enabled && (option.state & State_MouseOver) && (option.activeSubControls & SC_SliderHandle);
+        painter->setBrush(!enabled                        ? c.dimText
+                : active || (option.state & State_Sunken) ? QColor(Qt::white)
+                                                          : QColor(0xf6f5f4));
+        painter->setPen(QPen(QColor(0, 0, 0, 50), 1));
+        painter->drawEllipse(knob, knobRadius - 0.5, knobRadius - 0.5);
+        if ((option.state & State_HasFocus) && (option.state & State_KeyboardFocusChange)) {
+            painter->setPen(QPen(focusRing(c), 2));
+            painter->setBrush(Qt::NoBrush);
+            painter->drawEllipse(knob, knobRadius + 1.5, knobRadius + 1.5);
+        }
+        painter->restore();
+    }
+
+    static void drawFocus(QPainter* painter, QRectF rect, int r)
+    {
+        painter->setPen(QPen(focusRing(colors()), 2));
+        painter->setBrush(Qt::NoBrush);
+        painter->drawRoundedRect(rect.adjusted(1, 1, -1, -1), std::max(0, r - 1), std::max(0, r - 1));
     }
 };
 
