@@ -18,6 +18,6 @@ pkgbase = libtde-bin
 	conflicts = libtde
 	noextract = libtde-0.3.0-x86_64.tar.zst
 	source = libtde-0.3.0-x86_64.tar.zst::https://github.com/zskamljic/libtde/releases/download/v0.3.0/libtde-0.3.0-x86_64.tar.zst
-	sha256sums = SKIP
+	sha256sums = 939d728bdba8cf3b5b56cf72679bd859aad246ad066a082d2b6be0bb082d76ee
 
 pkgname = libtde-bin
