@@ -2,7 +2,7 @@
 
 _pkgname=libtde
 pkgname=libtde-bin
-pkgver=0.2.0
+pkgver=0.3.0
 pkgrel=1
 pkgdesc='What TDE applications share: configuration, theme, window frame and dialogs'
 arch=(x86_64)
