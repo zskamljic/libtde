@@ -16,7 +16,8 @@ terminal to open, and when the screen locks. See
 `/usr/share/doc/libtde/examples`. Applications keep their own settings next to it, in
 `~/.config/tde/<application>/`, and apply changes to either as soon as a file is saved.
 
-Icons are taken from the configured theme, falling back to Adwaita. Qt draws some SVG icons
+Icons are taken from the configured theme, else the one GNOME and GTK programs use, falling back
+to Adwaita. Qt draws some SVG icons
 with black patches (masks and clip paths, which Adwaita uses for shadows); when librsvg's
 `rsvg-convert` is installed, those are drawn with it once and kept in `~/.cache/tde/icons`.
 

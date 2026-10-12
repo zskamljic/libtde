@@ -13,6 +13,7 @@
 #include <QMenu>
 #include <QPainter>
 #include <QPalette>
+#include <QProcess>
 #include <QProxyStyle>
 #include <QSettings>
 #include <QSlider>
@@ -709,6 +710,22 @@ private:
     QIcon m_source;
 };
 
+// The icon theme GNOME and GTK programs are set to use, which the settings of TDE set too.
+QString gnomeIconTheme()
+{
+    QProcess gsettings;
+    gsettings.setStandardInputFile(QProcess::nullDevice());
+    gsettings.setStandardErrorFile(QProcess::nullDevice());
+    gsettings.start(u"gsettings"_s, {u"get"_s, u"org.gnome.desktop.interface"_s, u"icon-theme"_s});
+    if (!gsettings.waitForFinished(2000) || gsettings.exitStatus() != QProcess::NormalExit || gsettings.exitCode() != 0)
+        return {};
+    // Printed as a GVariant string: in single quotes.
+    QString name = QString::fromUtf8(gsettings.readAllStandardOutput()).trimmed();
+    if (name.size() >= 2 && name.front() == u'\'' && name.back() == u'\'')
+        name = name.mid(1, name.size() - 2);
+    return name;
+}
+
 QString gtkIconTheme()
 {
     const QString configDir = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
@@ -739,11 +756,21 @@ void setupIconTheme(const QString& configured)
     searchPaths.prepend(repaired);
     QIcon::setThemeSearchPaths(searchPaths);
 
+    // Without one configured, the one the rest of the desktop uses: in TDE, the one its settings
+    // gave GNOME and GTK programs; elsewhere, what Qt's platform theme knows of first.
     QString name = configured;
+    const bool tde = qEnvironmentVariable("XDG_CURRENT_DESKTOP").split(u':').contains(u"TDE"_s, Qt::CaseInsensitive);
+    if (name.isEmpty() && tde)
+        name = gnomeIconTheme();
     if (name.isEmpty()) {
         const QString platform = QIcon::themeName();
-        name = platform.isEmpty() || platform == u"hicolor" ? gtkIconTheme() : platform;
+        if (!platform.isEmpty() && platform != u"hicolor")
+            name = platform;
     }
+    if (name.isEmpty())
+        name = gtkIconTheme();
+    if (name.isEmpty() && !tde)
+        name = gnomeIconTheme();
     if (name.isEmpty())
         name = u"Adwaita"_s;
     QIcon::setThemeName(name);
