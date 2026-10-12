@@ -38,6 +38,8 @@ private slots:
         QCOMPARE(config.appearance.theme, u"arc-dark"_s);
         QCOMPARE(config.appearance.cornerRadius, 5);
         QCOMPARE(config.lock.after, 5);
+        QVERIFY(config.lock.beforeSleep);
+        QCOMPARE(config.appearance.cursorSize, 24);
     }
 
     void desktopConfig()
@@ -49,8 +51,9 @@ private slots:
                 "return {\n"
                 "window_buttons = { position = \"left\", order = { \"close\", \"maximize\" } },\n"
                 "appearance = { theme = \"arc\", icon_theme = \"Paper\", corner_radius = radius * 2,\n"
+                "               cursor_theme = \"Adwaita\", cursor_size = 32,\n"
                 "               colors = { accent = \"#ff0000\" } },\n"
-                "lock = { after = 15 },\n"
+                "lock = { after = 15, before_sleep = false },\n"
                 "}\n"),
             config);
         QVERIFY(warnings.has_value());
@@ -62,6 +65,9 @@ private slots:
         QCOMPARE(config.appearance.cornerRadius, 8);
         QCOMPARE(config.appearance.colors.value(u"accent"_s), u"#ff0000"_s);
         QCOMPARE(config.lock.after, 15);
+        QVERIFY(!config.lock.beforeSleep);
+        QCOMPARE(config.appearance.cursorTheme, u"Adwaita"_s);
+        QCOMPARE(config.appearance.cursorSize, 32);
     }
 
     void badValuesWarnAndKeepDefaults()

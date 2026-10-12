@@ -25,6 +25,8 @@ struct DesktopConfig {
     struct Appearance {
         QString theme = QStringLiteral("arc-dark");
         QString iconTheme;
+        QString cursorTheme; // empty for the default one
+        int cursorSize = 24;
         QHash<QString, QString> colors;
         int cornerRadius = 5;
 
@@ -33,6 +35,7 @@ struct DesktopConfig {
 
     struct Lock {
         int after = 5; // minutes without input before the screen locks; 0 for never
+        bool beforeSleep = true; // locks before the computer sleeps, so it is locked when it wakes
 
         bool operator==(const Lock&) const = default;
     };

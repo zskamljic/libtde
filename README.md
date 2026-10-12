@@ -10,7 +10,8 @@ Licensed under the GNU General Public License, version 3 or later; see [LICENSE]
 
 `~/.config/tde/config.lua` holds the settings every TDE application follows: window button
 placement and order, theme (`arc-dark`, `arc`, or `system` to follow the desktop's light or
-dark preference), corner radius, icon theme, colour overrides and the terminal to open. See
+dark preference), corner radius, icon theme, pointer theme and size, colour overrides, the
+terminal to open, and when the screen locks. See
 [`data/config.lua`](data/config.lua); an installed copy is in
 `/usr/share/doc/libtde/examples`. Applications keep their own settings next to it, in
 `~/.config/tde/<application>/`, and apply changes to either as soon as a file is saved.

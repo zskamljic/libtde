@@ -62,6 +62,10 @@ void parse(LuaTableReader& reader, DesktopConfig& config)
             appearance.theme = theme->toString();
         if (const auto iconTheme = reader.string("icon_theme"))
             appearance.iconTheme = *iconTheme;
+        if (const auto cursorTheme = reader.string("cursor_theme"))
+            appearance.cursorTheme = *cursorTheme;
+        if (const auto cursorSize = reader.integer("cursor_size", 8, 256))
+            appearance.cursorSize = *cursorSize;
         if (const auto radius = reader.integer("corner_radius", 0, 24))
             appearance.cornerRadius = *radius;
         reader.table("colors", [&] {
@@ -74,6 +78,8 @@ void parse(LuaTableReader& reader, DesktopConfig& config)
         // Up to a day; longer is as good as never, which 0 says.
         if (const auto after = reader.integer("after", 0, 24 * 60))
             config.lock.after = *after;
+        if (const auto beforeSleep = reader.boolean("before_sleep"))
+            config.lock.beforeSleep = *beforeSleep;
     });
 }
 

@@ -28,6 +28,10 @@ return {
         -- Icon theme; by default the one the rest of the desktop uses.
         -- icon_theme = "Papirus-Dark",
 
+        -- Pointer theme and size; by default the one XCURSOR_THEME names, else "default".
+        -- cursor_theme = "Adwaita",
+        cursor_size = 24,       -- 8 to 256
+
         -- Override single theme colours. Names: window, base, header, sidebar, sidebar_text,
         -- text, dim_text, accent, accent_text, border, hover, pressed, entry, scrollbar,
         -- close_hover, error. Values are "#rrggbb" or "#aarrggbb".
@@ -40,5 +44,7 @@ return {
         -- Minutes without input before the screen locks; 0 locks only when asked, and
         -- before sleeping. Programs such as video players keep it from locking meanwhile.
         after = 5,              -- 0 to 1440
+        -- Whether the screen locks before the computer sleeps, so it is locked when it wakes.
+        before_sleep = true,
     },
 }
