@@ -373,6 +373,8 @@ public:
             return 0; // a list below it, as GNOME's drop-downs open, rather than a menu over it
         case SH_ComboBox_AllowWheelScrolling:
             return 0; // scrolling a page goes past them, rather than changing them
+        case SH_Slider_AbsoluteSetButtons:
+            return Qt::LeftButton; // a click on a slider's track takes its knob there, to be dragged on
         case SH_DialogButtonLayout:
             return QDialogButtonBox::GnomeLayout; // Cancel on the left, the action on the right
         default:
