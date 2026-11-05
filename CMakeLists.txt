@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 
 project(libtde
-    VERSION 0.3.0
+    VERSION 0.3.1
     DESCRIPTION "What TDE applications share: configuration, theme, window frame and dialogs"
     LANGUAGES CXX)
 
