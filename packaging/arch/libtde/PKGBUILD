@@ -25,7 +25,7 @@ optdepends=(
 )
 provides=('libtde.so')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('2cb57690450478bd6356160d99d37543d33c0b16cafe1bf3b976d45de8b95366')
 
 build() {
   cmake -B build -S "$pkgname-$pkgver" -G Ninja \
