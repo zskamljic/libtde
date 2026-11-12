@@ -40,6 +40,7 @@ private slots:
         QCOMPARE(config.lock.after, 5);
         QVERIFY(config.lock.beforeSleep);
         QCOMPARE(config.appearance.cursorSize, 24);
+        QCOMPARE(config.titleBarSize, tde::TitleBarSize::Normal);
     }
 
     void desktopConfig()
@@ -54,6 +55,7 @@ private slots:
                 "               cursor_theme = \"Adwaita\", cursor_size = 32,\n"
                 "               colors = { accent = \"#ff0000\" } },\n"
                 "lock = { after = 15, before_sleep = false },\n"
+                "title_bars = { size = \"compact\" },\n"
                 "}\n"),
             config);
         QVERIFY(warnings.has_value());
@@ -68,6 +70,7 @@ private slots:
         QVERIFY(!config.lock.beforeSleep);
         QCOMPARE(config.appearance.cursorTheme, u"Adwaita"_s);
         QCOMPARE(config.appearance.cursorSize, 32);
+        QCOMPARE(config.titleBarSize, tde::TitleBarSize::Compact);
     }
 
     void badValuesWarnAndKeepDefaults()

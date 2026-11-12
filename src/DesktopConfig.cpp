@@ -27,6 +27,11 @@ constexpr std::pair<QStringView, WindowButton> windowButtons[] = {
     {u"close", WindowButton::Close},
 };
 
+constexpr std::pair<QStringView, TitleBarSize> titleBarSizes[] = {
+    {u"normal", TitleBarSize::Normal},
+    {u"compact", TitleBarSize::Compact},
+};
+
 constexpr std::pair<QStringView, QStringView> themes[] = {
     {u"arc-dark", u"arc-dark"},
     {u"arc", u"arc"},
@@ -51,6 +56,11 @@ void parse(LuaTableReader& reader, DesktopConfig& config)
             });
             buttons.order = std::move(order);
         });
+    });
+
+    reader.table("title_bars", [&] {
+        if (const auto size = reader.choice<TitleBarSize>("size", titleBarSizes))
+            config.titleBarSize = *size;
     });
 
     if (const auto terminal = reader.string("terminal"))
@@ -123,7 +133,16 @@ const DesktopConfig& desktop()
 
 void setDesktop(DesktopConfig config)
 {
+    if (config == s_desktop)
+        return;
     s_desktop = std::move(config);
+    emit desktopNotifier().changed();
+}
+
+DesktopNotifier& desktopNotifier()
+{
+    static DesktopNotifier notifier;
+    return notifier;
 }
 
 } // namespace tde

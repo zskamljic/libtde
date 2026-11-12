@@ -15,6 +15,11 @@ return {
         order = { "minimize", "maximize", "close" },
     },
 
+    title_bars = {
+        -- How tall title bars and header bars are: "normal" or "compact".
+        size = "normal",
+    },
+
     -- Terminal to open ("Open in Terminal", terminal applications). By default $TERMINAL,
     -- else the first one installed of the usual ones.
     -- terminal = "kitty",

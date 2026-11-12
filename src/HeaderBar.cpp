@@ -1,5 +1,6 @@
 #include "tde/HeaderBar.hpp"
 
+#include "tde/DesktopConfig.hpp"
 #include "tde/Theme.hpp"
 
 #include <QApplication>
@@ -11,6 +12,11 @@
 using namespace Qt::StringLiterals;
 
 namespace tde {
+namespace {
+
+constexpr int NormalControl = 34; // pixels
+
+} // namespace
 
 HeaderBar::HeaderBar(QWidget* parent)
     : QWidget(parent)
@@ -18,9 +24,39 @@ HeaderBar::HeaderBar(QWidget* parent)
 {
     setObjectName(u"HeaderBar"_s);
     setAttribute(Qt::WA_StyledBackground);
-    setFixedHeight(47);
-    m_layout->setContentsMargins(6, 6, 6, 7);
     m_layout->setSpacing(6);
+    applySize();
+    connect(&desktopNotifier(), &DesktopNotifier::changed, this, &HeaderBar::applySize);
+}
+
+int HeaderBar::controlHeight()
+{
+    return desktop().titleBarSize == TitleBarSize::Compact ? 28 : NormalControl;
+}
+
+void HeaderBar::applySize()
+{
+    const int control = controlHeight();
+    const bool compact = control < NormalControl;
+    setFixedHeight(control + (compact ? 9 : 13));
+    m_layout->setContentsMargins(6, compact ? 4 : 6, 6, compact ? 5 : 7);
+    // Buttons, path bars and search fields have the height of a control, which applications
+    // give them as a normal one has it; they are given the one there is now.
+    for (QWidget* child : findChildren<QWidget*>()) {
+        const int height = child->maximumHeight();
+        if (child->minimumHeight() == height && (height == NormalControl || height == m_controlHeight))
+            child->setFixedHeight(control);
+        if (child->objectName() == u"HeaderButton")
+            child->setMinimumWidth(control);
+    }
+    m_controlHeight = control;
+}
+
+void HeaderBar::showEvent(QShowEvent* event)
+{
+    // What the application put in since it was made.
+    applySize();
+    QWidget::showEvent(event);
 }
 
 QToolButton* HeaderBar::makeButton(const QString& iconName, const QString& toolTip, QWidget* parent)
@@ -31,8 +67,8 @@ QToolButton* HeaderBar::makeButton(const QString& iconName, const QString& toolT
     button->setIconSize(QSize(16, 16));
     button->setToolTip(toolTip);
     button->setFocusPolicy(Qt::NoFocus);
-    button->setFixedHeight(34);
-    button->setMinimumWidth(34);
+    button->setFixedHeight(controlHeight());
+    button->setMinimumWidth(controlHeight());
     return button;
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QHash>
+#include <QObject>
 #include <QString>
 #include <QStringList>
 
@@ -12,6 +13,8 @@ namespace tde {
 
 enum class ButtonSide { Left, Right };
 enum class WindowButton { Minimize, Maximize, Close };
+// How tall title bars and header bars are.
+enum class TitleBarSize { Normal, Compact };
 
 // Settings shared by all TDE applications, from ~/.config/tde/config.lua.
 struct DesktopConfig {
@@ -41,6 +44,7 @@ struct DesktopConfig {
     };
 
     WindowButtons windowButtons;
+    TitleBarSize titleBarSize = TitleBarSize::Normal;
     Appearance appearance;
     Lock lock;
     QString terminal; // program to open terminals with; empty picks one
@@ -64,5 +68,14 @@ DesktopConfig loadDesktopConfig(const QString& path = desktopConfigPath());
 // The desktop config of this process: set at startup, and again when the file changes.
 const DesktopConfig& desktop();
 void setDesktop(DesktopConfig config);
+
+// Tells when setDesktop() changes the desktop config, for parts that follow it as it is edited.
+class DesktopNotifier : public QObject {
+    Q_OBJECT
+
+signals:
+    void changed();
+};
+DesktopNotifier& desktopNotifier();
 
 } // namespace tde
